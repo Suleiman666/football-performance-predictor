@@ -1,21 +1,47 @@
 """
 data.py
-Pulls StatsBomb open data and builds a match-outcome dataset.
+Pulls StatsBomb open data (from local clone) and builds a match-outcome dataset.
 """
 
+import json
+from pathlib import Path
+
 import pandas as pd
-from statsbombpy import sb
+
+# Adjust this if your clone lives somewhere else
+OPEN_DATA_DIR = Path("data/raw/open-data/data")
 
 
-def get_available_competitions():
+def get_available_competitions() -> pd.DataFrame:
     """See what competitions/seasons are actually available before picking a scope."""
-    comps = sb.competitions()
+    with open(OPEN_DATA_DIR / "competitions.json") as f:
+        comps = pd.DataFrame(json.load(f))
     return comps
 
 
 def get_matches(competition_id: int, season_id: int) -> pd.DataFrame:
-    """Pull all matches for a competition/season."""
-    matches = sb.matches(competition_id=competition_id, season_id=season_id)
+    """Pull all matches for a competition/season from the local clone."""
+    path = OPEN_DATA_DIR / "matches" / str(competition_id) / f"{season_id}.json"
+    with open(path) as f:
+        raw = json.load(f)
+
+    matches = pd.json_normalize(raw)
+
+    # Normalise the nested team name fields to flat columns matching
+    # what the rest of the pipeline expects
+    matches = matches.rename(columns={
+        "home_team.home_team_name": "home_team",
+        "away_team.away_team_name": "away_team",
+    })
+
+    matches["match_date"] = pd.to_datetime(matches["match_date"])
+
+    keep_cols = [
+        "match_id", "match_date", "home_team", "away_team",
+        "home_score", "away_score", "competition_stage.name",
+    ]
+    matches = matches[[c for c in keep_cols if c in matches.columns]]
+
     return matches
 
 
@@ -122,6 +148,7 @@ def build_team_form(matches: pd.DataFrame, n_games: int = 5) -> pd.DataFrame:
 
 
 def save_dataset(df: pd.DataFrame, path: str = "data/processed/matches.csv"):
+    Path(path).parent.mkdir(parents=True, exist_ok=True)
     df.to_csv(path, index=False)
     print(f"Saved {len(df)} rows to {path}")
 
