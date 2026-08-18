@@ -157,6 +157,11 @@ if __name__ == "__main__":
     comps = get_available_competitions()
     print(comps[["competition_id", "season_id", "competition_name", "season_name"]])
 
+    matches = get_matches(competition_id = 2, season_id= 27)
+    matches = add_result_column(matches)
+    matches = build_team_form(matches)
+    save_dataset(matches)
+
     # Once you've picked one from the printed list, plug the IDs in here:
     # matches = get_matches(competition_id=..., season_id=...)
     # matches = add_result_column(matches)
